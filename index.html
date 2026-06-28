@@ -1,19 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Assay - Literature Lookup</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
 .assay-root {
   --paper: #FAFAF7;
-  --ink: #000000; /* Darkened to pure black */
-  --ink-soft: #333333; /* Darkened for better readability */
-  --ink-faint: #555555;
+  --ink: #1B1F1D;
+  --ink-soft: rgba(27,31,29,0.62);
+  --ink-faint: rgba(27,31,29,0.38);
   --bench: #EFEDE4;
-  --hairline: #CCCCCC;
+  --hairline: #D8D4C8;
   --reagent: #1E5AA8;
   --reagent-soft: rgba(30,90,168,0.10);
   --assay-green: #2F7A4F;
@@ -25,7 +19,7 @@
   background: var(--paper);
   color: var(--ink);
   font-family: 'IBM Plex Sans', sans-serif;
-  min-height: 100vh;
+  min-height: 100%;
   padding: 28px 16px 60px;
   display: flex;
   justify-content: center;
@@ -35,7 +29,7 @@
 
 .assay-container {
   width: 100%;
-  max-width: 720px; /* Slightly wider for better organization */
+  max-width: 680px;
 }
 
 .assay-header { margin-bottom: 22px; }
@@ -67,32 +61,32 @@
 }
 
 .assay-subtitle {
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--ink-soft);
   line-height: 1.5;
-  max-width: 520px;
+  max-width: 480px;
 }
 
 .assay-panel {
   background: var(--bench);
   border: 1px solid var(--hairline);
   border-radius: 10px;
-  padding: 20px;
-  margin-bottom: 30px;
+  padding: 18px;
+  margin-bottom: 24px;
 }
 
-.assay-field { margin-bottom: 16px; }
+.assay-field { margin-bottom: 14px; }
 .assay-field:last-of-type { margin-bottom: 0; }
 
 .assay-label {
   display: block;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--reagent);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .assay-input, .assay-textarea {
@@ -100,15 +94,15 @@
   background: var(--paper);
   border: 1px solid var(--hairline);
   border-radius: 6px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 15px;
+  font-size: 14.5px;
   color: var(--ink);
   outline: none;
   transition: border-color 0.15s ease;
 }
 
-.assay-input::placeholder, .assay-textarea::placeholder { color: #888888; }
+.assay-input::placeholder, .assay-textarea::placeholder { color: var(--ink-faint); }
 
 .assay-input:focus, .assay-textarea:focus {
   border-color: var(--reagent);
@@ -117,16 +111,16 @@
 
 .assay-pills {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .assay-pill {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
+  font-size: 11.5px;
   letter-spacing: 0.04em;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 6px 11px;
+  border-radius: 5px;
   border: 1px solid var(--hairline);
   background: var(--paper);
   color: var(--ink-soft);
@@ -140,14 +134,13 @@
   background: var(--reagent);
   border-color: var(--reagent);
   color: var(--paper);
-  font-weight: 600;
 }
 
-.assay-row { display: flex; gap: 14px; align-items: flex-start; margin-top: 20px; flex-wrap: wrap; }
+.assay-row { display: flex; gap: 14px; align-items: flex-start; margin-top: 16px; flex-wrap: wrap; }
 
 .assay-button {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -155,7 +148,7 @@
   color: var(--paper);
   border: none;
   border-radius: 6px;
-  padding: 12px 24px;
+  padding: 11px 20px;
   cursor: pointer;
   transition: opacity 0.15s ease, transform 0.1s ease;
 }
@@ -169,11 +162,11 @@
   color: var(--ink-soft);
   border: 1px solid var(--hairline);
 }
-.assay-button.secondary:hover { border-color: var(--ink); color: var(--ink); opacity: 1; }
+.assay-button.secondary:hover { border-color: var(--ink-faint); color: var(--ink); opacity: 1; }
 
 .assay-status {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-bottom: 18px;
   min-height: 18px;
@@ -192,23 +185,22 @@
 @keyframes assayBlink { 50% { opacity: 0; } }
 
 .assay-error {
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--error);
   background: rgba(178,59,59,0.07);
   border: 1px solid rgba(178,59,59,0.25);
   border-radius: 8px;
-  padding: 14px 18px;
-  margin-bottom: 20px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
   line-height: 1.5;
-  font-weight: 500;
 }
 
 .assay-empty {
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--ink-faint);
-  border: 2px dashed var(--hairline);
+  border: 1px dashed var(--hairline);
   border-radius: 10px;
-  padding: 32px 20px;
+  padding: 28px 18px;
   text-align: center;
   line-height: 1.6;
 }
@@ -217,63 +209,52 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 16px;
-  border-bottom: 2px solid var(--ink);
-  padding-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .assay-resultscount {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
+  font-size: 11.5px;
+  color: var(--ink-faint);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .assay-copy {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--reagent);
   background: none;
   border: none;
   cursor: pointer;
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-underline-offset: 2px;
   padding: 0;
-  font-weight: 500;
-}
-
-.assay-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px; /* Better spacing between results */
 }
 
 .assay-entry {
   display: flex;
-  gap: 16px;
-  background: #FFFFFF;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  gap: 12px;
+  border-bottom: 1px solid var(--hairline);
+  padding: 14px 2px;
 }
+
+.assay-entry:last-child { border-bottom: none; }
 
 .assay-rail {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
-  width: 32px;
+  width: 30px;
+  padding-top: 1px;
 }
 
 .assay-accession {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-soft);
+  font-size: 11px;
+  color: var(--ink-faint);
 }
 
 .assay-tab {
@@ -286,61 +267,49 @@
 .assay-body { flex: 1; min-width: 0; }
 
 .assay-entry-title {
-  display: block;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14.5px;
+  font-weight: 600;
   color: var(--ink);
   text-decoration: none;
   line-height: 1.4;
-  margin-bottom: 8px;
 }
 
-.assay-entry-title:hover { text-decoration: underline; color: var(--reagent); }
+.assay-entry-title:hover { text-decoration: underline; }
 
 .assay-entry-relevance {
-  font-size: 14px;
-  color: var(--ink); /* Black text for readability */
-  line-height: 1.6;
-  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 5px 0 7px;
 }
 
 .assay-entry-meta {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
+  font-size: 10.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  color: var(--ink-soft);
 }
 
 .assay-tag {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 2px 7px;
   border-radius: 4px;
-  margin-right: 10px;
-  font-weight: 600;
+  margin-right: 7px;
 }
 
 .assay-footnote {
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin-top: 24px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 20px;
   line-height: 1.5;
-  text-align: center;
 }
 
 @media (max-width: 480px) {
   .assay-title { font-size: 22px; }
   .assay-row { flex-direction: column; align-items: stretch; }
   .assay-row .assay-button { width: 100%; text-align: center; }
-  .assay-entry { flex-direction: column; gap: 12px; }
-  .assay-rail { flex-direction: row; width: 100%; justify-content: flex-start; }
-  .assay-tab { height: 4px; width: 24px; min-height: auto; }
 }
 </style>
-</head>
-<body>
 
 <div class="assay-root" id="assayRoot">
   <div class="assay-container">
@@ -348,7 +317,7 @@
     <div class="assay-header">
       <span class="assay-wordmark"><span class="dot"></span>Assay</span>
       <div class="assay-title">Literature lookup</div>
-      <div class="assay-subtitle">Enter a compound, gene, or pathway and what you're trying to find out. It searches for relevant studies.</div>
+      <div class="assay-subtitle">Enter a compound, gene, or pathway and what you're trying to find out. It searches PubMed, Scholar, and relevant specialty databases for studies that actually match.</div>
     </div>
 
     <div class="assay-panel">
@@ -365,3 +334,236 @@
         <div class="assay-pills" id="assayPills">
           <button class="assay-pill active" data-type="auto">Auto-detect</button>
           <button class="assay-pill" data-type="compound">Compound</button>
+          <button class="assay-pill" data-type="gene">Gene</button>
+          <button class="assay-pill" data-type="pathway">Pathway</button>
+        </div>
+      </div>
+      <div class="assay-row">
+        <button class="assay-button" id="assayRun">Run assay</button>
+        <button class="assay-button secondary" id="assayClear">Clear</button>
+      </div>
+    </div>
+
+    <div id="assayStatus"></div>
+    <div id="assayOutput">
+      <div class="assay-empty">No samples queried yet. Enter a target above to pull literature.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  const root = document.getElementById('assayRoot');
+  if (!root) { console.error('Assay: root container not found.'); return; }
+  const targetInput = root.querySelector('#assayTarget');
+  const goalInput = root.querySelector('#assayGoal');
+  const pills = root.querySelectorAll('.assay-pill');
+  const runBtn = root.querySelector('#assayRun');
+  const clearBtn = root.querySelector('#assayClear');
+  const statusEl = root.querySelector('#assayStatus');
+  const outputEl = root.querySelector('#assayOutput');
+
+  let selectedType = 'auto';
+  let lastResults = [];
+  let tickerInterval = null;
+
+  pills.forEach(p => {
+    p.addEventListener('click', () => {
+      pills.forEach(x => x.classList.remove('active'));
+      p.classList.add('active');
+      selectedType = p.dataset.type;
+    });
+  });
+
+  clearBtn.addEventListener('click', () => {
+    targetInput.value = '';
+    goalInput.value = '';
+    statusEl.innerHTML = '';
+    outputEl.innerHTML = '<div class="assay-empty">No samples queried yet. Enter a target above to pull literature.</div>';
+  });
+
+  [targetInput, goalInput].forEach(el => {
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); run(); }
+    });
+  });
+
+  runBtn.addEventListener('click', run);
+
+  const tickerPhrases = [
+    'querying pubmed', 'cross-referencing scholar', 'checking specialty databases',
+    'reading abstracts', 'scoring relevance', 'logging specimens'
+  ];
+
+  function startTicker() {
+    let i = 0;
+    statusEl.innerHTML = `<div class="assay-status">&gt; ${tickerPhrases[0]}<span class="cursor"></span></div>`;
+    const line = statusEl.querySelector('.assay-status');
+    tickerInterval = setInterval(() => {
+      i = (i + 1) % tickerPhrases.length;
+      line.innerHTML = `&gt; ${tickerPhrases[i]}<span class="cursor"></span>`;
+    }, 1400);
+  }
+
+  function stopTicker() {
+    if (tickerInterval) clearInterval(tickerInterval);
+    tickerInterval = null;
+    statusEl.innerHTML = '';
+  }
+
+  function sourceStyle(source) {
+    const s = (source || '').toLowerCase();
+    if (s.includes('pubmed') || s.includes('medrxiv') || s.includes('biorxiv')) {
+      return { tab: 'var(--reagent)', bg: 'var(--reagent-soft)', fg: 'var(--reagent)' };
+    }
+    if (s.includes('scholar')) {
+      return { tab: 'var(--assay-green)', bg: 'var(--assay-green-soft)', fg: 'var(--assay-green)' };
+    }
+    return { tab: 'var(--flag-amber)', bg: 'var(--flag-amber-soft)', fg: 'var(--flag-amber)' };
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+  }
+
+  function renderResults(results) {
+    lastResults = results;
+    if (!results.length) {
+      outputEl.innerHTML = '<div class="assay-empty">No matching studies turned up for this target and goal. Try broadening the goal or double-checking the target name.</div>';
+      return;
+    }
+    let html = `
+      <div class="assay-resultsbar">
+        <span class="assay-resultscount">${results.length} result${results.length === 1 ? '' : 's'}</span>
+        <button class="assay-copy" id="assayCopyLinks">Copy all links</button>
+      </div>
+      <div class="assay-list">`;
+
+    results.forEach((r, idx) => {
+      const style = sourceStyle(r.source);
+      const num = String(idx + 1).padStart(3, '0');
+      html += `
+        <div class="assay-entry">
+          <div class="assay-rail">
+            <span class="assay-accession">${num}</span>
+            <span class="assay-tab" style="background:${style.tab}"></span>
+          </div>
+          <div class="assay-body">
+            <a class="assay-entry-title" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>
+            <div class="assay-entry-relevance">${escapeHtml(r.relevance)}</div>
+            <div class="assay-entry-meta">
+              <span class="assay-tag" style="background:${style.bg}; color:${style.fg}">${escapeHtml(r.source || 'source')}</span>${r.year ? escapeHtml(r.year) : ''}
+            </div>
+          </div>
+        </div>`;
+    });
+
+    html += '</div><div class="assay-footnote">Links open in a new tab. Always check the original study before relying on it — search results can occasionally miss context.</div>';
+    outputEl.innerHTML = html;
+
+    root.querySelector('#assayCopyLinks').addEventListener('click', () => {
+      const text = results.map(r => r.url).join('\n');
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = root.querySelector('#assayCopyLinks');
+        const original = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      });
+    });
+  }
+
+  function showError(message, raw) {
+    let html = `<div class="assay-error">${escapeHtml(message)}</div>`;
+    if (raw) {
+      html += `<div class="assay-empty" style="text-align:left; white-space:pre-wrap; font-family:'IBM Plex Mono',monospace; font-size:11.5px;">${escapeHtml(raw.slice(0, 1500))}</div>`;
+    }
+    outputEl.innerHTML = html;
+  }
+
+  async function run() {
+    const target = targetInput.value.trim();
+    const goal = goalInput.value.trim();
+    if (!target) {
+      targetInput.focus();
+      targetInput.style.borderColor = 'var(--error)';
+      setTimeout(() => { targetInput.style.borderColor = ''; }, 1200);
+      return;
+    }
+
+    runBtn.disabled = true;
+    outputEl.innerHTML = '';
+    startTicker();
+
+    const typeLabel = selectedType === 'auto' ? 'unspecified — infer whether it is a compound, gene, or pathway from the name itself'
+      : selectedType;
+
+    const systemPrompt = `You are a scientific literature search assistant working inside a research tool. Use the web search tool to find REAL studies about the given target, evaluated against the stated research goal.
+
+Search across PubMed, Google Scholar, and whichever specialty databases fit the target type: PubChem and ChEMBL for compounds; NCBI Gene, GeneCards, and UniProt for genes; KEGG, Reactome, and WikiPathways for pathways; bioRxiv and medRxiv for preprints. Run several distinct searches covering different angles before answering.
+
+Only include results you actually found via search, with real working URLs. Never invent papers, links, authors, or details. If a result's relevance to the stated goal is unclear, leave it out rather than guessing.
+
+Respond with ONLY raw JSON, no markdown fences, no commentary, matching exactly this schema:
+{"results":[{"title":string,"url":string,"source":string,"year":string|null,"relevance":string}]}
+
+Limit to the 8-10 most relevant results. Each "relevance" string must be under 18 words, written in your own words (never quote the source), explaining how that specific study connects to the goal. Each "source" should be a short label like "PubMed", "Google Scholar", "PubChem", "bioRxiv", etc. If nothing relevant turns up, return {"results":[]}.`;
+
+    const userPrompt = `Target type: ${typeLabel}
+Target: ${target}
+Research goal: ${goal || 'general relevant literature on this target'}
+
+Find the most relevant real studies.`;
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed (${response.status})`);
+      }
+
+      const data = await response.json();
+      const text = (data.content || [])
+        .map(block => (block.type === 'text' ? block.text : ''))
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+
+      if (!text) {
+        throw new Error('Empty response from search.');
+      }
+
+      const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (parseErr) {
+        showError('Got a response back, but could not parse it as structured results. Raw output below — try running again.', cleaned);
+        return;
+      }
+
+      const results = Array.isArray(parsed.results) ? parsed.results : [];
+      renderResults(results.filter(r => r && r.title && r.url));
+
+    } catch (err) {
+      showError('Something went wrong running the search: ' + err.message + '. Try again in a moment.');
+    } finally {
+      stopTicker();
+      runBtn.disabled = false;
+    }
+  }
+})();
+</script>
