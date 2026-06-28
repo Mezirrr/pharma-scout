@@ -67,7 +67,9 @@ Your task is twofold:
    - Do not rely solely on surface-level or indirect physiological properties (such as changes in physical loading or muscle mass). You must cleanly map out direct cell-signaling pathways (e.g., direct ligand-receptor actions on osteoblasts/osteoclasts).
    - Trace cross-talk between related ligands/pathways comprehensively. If a target receptor is blocked, identify ALL major competing ligands (e.g., Myostatin, Activins, and GDFs) and explain downstream shifts in alternative pathways (e.g., BMP/TGF-beta balancing).
    - Detail the explicit molecular mechanisms behind any side effects or safety risks mentioned (e.g., mechanistic drivers of heterotopic/ectopic ossification or pathway runaways).
-2. Evaluate the provided list of papers and select the top relevant ones (up to a maximum of 15). Write a strict maximum 18-word "relevance" explanation for each, revealing how it links or provides foundational/partial context back to the target and goal.
+2. Evaluate the provided list of papers and select the top relevant ones (up to a maximum of 15). 
+   - Write a strict maximum 18-word "relevance" explanation for each, revealing how it links or provides foundational/partial context back to the target and goal.
+   - Analyze the title and abstract text to accurately classify the "studyType" as exactly one of these strings: "In Vitro", "In Vivo", or "Human". If it cannot be determined, default to "In Vivo".
 
 Respond with ONLY raw JSON matching exactly this schema:
 {
@@ -78,7 +80,8 @@ Respond with ONLY raw JSON matching exactly this schema:
       "url": "string",
       "source": "PubMed",
       "year": "string",
-      "relevance": "string"
+      "relevance": "string",
+      "studyType": "In Vitro | In Vivo | Human"
     }
   ]
 }`;
@@ -104,7 +107,6 @@ Respond with ONLY raw JSON matching exactly this schema:
     const groqData = await groqRes.json();
     const text = groqData.choices[0].message.content;
     
-    // Attach fallback indicator to the response payload for frontend rendering
     const finalJson = JSON.parse(text);
     finalJson.isFallback = isFallback;
 
