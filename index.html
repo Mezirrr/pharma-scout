@@ -618,3 +618,25 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target, goal, typeLabel })
+      });
+
+      if (!response.ok) throw new Error(`Server request failed (${response.status})`);
+
+      const parsed = await response.json();
+      const results = Array.isArray(parsed.results) ? parsed.results : [];
+      
+      renderPayload(parsed.directResponse, results.filter(r => r && r.title && r.url), parsed.isFallback || false);
+      callSucceeded = true;
+
+    } catch (err) {
+      showError('Something went wrong running the search: ' + err.message + '. Try again in a moment.');
+      callSucceeded = false;
+    } finally {
+      stopTicker();
+      handleCooldown(callSucceeded ? 10 : 5);
+    }
+  }
+})();
+</script>
+</body>
+</html>
