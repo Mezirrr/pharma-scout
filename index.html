@@ -233,6 +233,33 @@
   margin-bottom: 8px;
 }
 
+.assay-direct-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* Truncates clean to 3 lines preview by default */
+  -webkit-box-orient: vertical;  
+  overflow: hidden;
+  transition: max-height 0.25s ease-out;
+}
+
+.assay-direct-text.expanded {
+  display: block;
+  overflow: visible;
+}
+
+.assay-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--reagent);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 8px;
+  text-decoration: underline;
+  display: block;
+}
+
 .assay-resultsbar {
   display: flex;
   justify-content: space-between;
@@ -352,239 +379,4 @@
     <div class="assay-panel">
       <div class="assay-field">
         <label class="assay-label">Target</label>
-        <input class="assay-input" id="assayTarget" type="text" placeholder="e.g. KY19382, BRCA1, mTOR pathway" />
-      </div>
-      <div class="assay-field">
-        <label class="assay-label">Goal / context</label>
-        <textarea class="assay-textarea" id="assayGoal" rows="2" placeholder="e.g. anti-inflammatory activity, role in tumor suppression, drug interactions"></textarea>
-      </div>
-      <div class="assay-field">
-        <label class="assay-label">Type</label>
-        <div class="assay-pills" id="assayPills">
-          <button class="assay-pill active" data-type="auto">Auto-detect</button>
-          <button class="assay-pill" data-type="compound">Compound</button>
-          <button class="assay-pill" data-type="gene">Gene</button>
-          <button class="assay-pill" data-type="pathway">Pathway</button>
-        </div>
-      </div>
-      <div class="assay-row">
-        <button class="assay-button" id="assayRun">Run assay</button>
-        <button class="assay-button secondary" id="assayClear">Clear</button>
-      </div>
-    </div>
-
-    <div id="assayStatus"></div>
-    <div id="assayOutput">
-      <div class="assay-empty">No samples queried yet. Enter a target above to pull literature.</div>
-    </div>
-
-  </div>
-</div>
-
-<script>
-(function() {
-  const root = document.getElementById('assayRoot');
-  if (!root) { console.error('Assay: root container not found.'); return; }
-  const targetInput = root.querySelector('#assayTarget');
-  const goalInput = root.querySelector('#assayGoal');
-  const pills = root.querySelectorAll('.assay-pill');
-  const runBtn = root.querySelector('#assayRun');
-  const clearBtn = root.querySelector('#assayClear');
-  const statusEl = root.querySelector('#assayStatus');
-  const outputEl = root.querySelector('#assayOutput');
-
-  let selectedType = 'auto';
-  let isCooldown = false;
-  let tickerInterval = null;
-
-  pills.forEach(p => {
-    p.addEventListener('click', () => {
-      pills.forEach(x => x.classList.remove('active'));
-      p.classList.add('active');
-      selectedType = p.dataset.type;
-    });
-  });
-
-  clearBtn.addEventListener('click', () => {
-    targetInput.value = '';
-    goalInput.value = '';
-    statusEl.innerHTML = '';
-    outputEl.innerHTML = '<div class="assay-empty">No samples queried yet. Enter a target above to pull literature.</div>';
-  });
-
-  [targetInput, goalInput].forEach(el => {
-    el.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { 
-        e.preventDefault(); 
-        if (!isCooldown) run(); 
-      }
-    });
-  });
-
-  runBtn.addEventListener('click', run);
-
-  const tickerPhrases = [
-    'optimizing search parameter matrices', 'querying pubmed systems', 'cross-referencing structural records', 'analyzing abstracts with 120b logic', 'scoring lateral path linkages'
-  ];
-
-  function startTicker() {
-    let i = 0;
-    statusEl.innerHTML = `<div class="assay-status">&gt; ${tickerPhrases[0]}<span class="cursor"></span></div>`;
-    const line = statusEl.querySelector('.assay-status');
-    tickerInterval = setInterval(() => {
-      i = (i + 1) % tickerPhrases.length;
-      line.innerHTML = `&gt; ${tickerPhrases[i]}<span class="cursor"></span>`;
-    }, 1400);
-  }
-
-  function stopTicker() {
-    if (tickerInterval) clearInterval(tickerInterval);
-    tickerInterval = null;
-    statusEl.innerHTML = '';
-  }
-
-  function sourceStyle(source) {
-    const s = (source || '').toLowerCase();
-    if (s.includes('pubmed') || s.includes('medrxiv') || s.includes('biorxiv')) {
-      return { tab: 'var(--reagent)', bg: 'var(--reagent-soft)', fg: 'var(--reagent)' };
-    }
-    if (s.includes('scholar')) {
-      return { tab: 'var(--assay-green)', bg: 'var(--assay-green-soft)', fg: 'var(--assay-green)' };
-    }
-    return { tab: 'var(--flag-amber)', bg: 'var(--flag-amber-soft)', fg: 'var(--flag-amber)' };
-  }
-
-  function escapeHtml(str) {
-    const d = document.createElement('div');
-    d.textContent = str == null ? '' : String(str);
-    return d.innerHTML;
-  }
-
-  function renderPayload(directResponse, results) {
-    let html = '';
-    
-    if (directResponse) {
-      html += `
-        <div class="assay-direct-response">
-          <div class="assay-direct-title">Synthesis & Analytical Cross-Linking</div>
-          <div>${escapeHtml(directResponse)}</div>
-        </div>
-      `;
-    }
-
-    if (!results || !results.length) {
-      html += '<div class="assay-empty">No exact literature matching current keywords. See synthesis analysis box above for structural insights.</div>';
-      outputEl.innerHTML = html;
-      return;
-    }
-
-    html += `
-      <div class="assay-resultsbar">
-        <span class="assay-resultscount">${results.length} result${results.length === 1 ? '' : 's'}</span>
-        <button class="assay-copy" id="assayCopyLinks">Copy all links</button>
-      </div>
-      <div class="assay-list">`;
-
-    results.forEach((r, idx) => {
-      const style = sourceStyle(r.source);
-      const num = String(idx + 1).padStart(3, '0');
-      html += `
-        <div class="assay-entry">
-          <div class="assay-rail">
-            <span class="assay-accession">${num}</span>
-            <span class="assay-tab" style="background:${style.tab}"></span>
-          </div>
-          <div class="assay-body">
-            <a class="assay-entry-title" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>
-            <div class="assay-entry-relevance">${escapeHtml(r.relevance)}</div>
-            <div class="assay-entry-meta">
-              <span class="assay-tag" style="background:${style.bg}; color:${style.fg}">${escapeHtml(r.source || 'source')}</span>${r.year ? escapeHtml(r.year) : ''}
-            </div>
-          </div>
-        </div>`;
-    });
-
-    html += '</div><div class="assay-footnote">Links open in a new tab. Always review structural documentation before proceeding.</div>';
-    outputEl.innerHTML = html;
-
-    const copyBtn = root.querySelector('#assayCopyLinks');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        const text = results.map(r => r.url).join('\n');
-        navigator.clipboard.writeText(text).then(() => {
-          const original = copyBtn.textContent;
-          copyBtn.textContent = 'Copied';
-          setTimeout(() => { copyBtn.textContent = original; }, 1500);
-        });
-      });
-    }
-  }
-
-  function showError(message) {
-    outputEl.innerHTML = `<div class="assay-error">${escapeHtml(message)}</div>`;
-  }
-
-  function handleCooldown() {
-    isCooldown = true;
-    runBtn.disabled = true;
-    let secondsLeft = 5;
-    
-    runBtn.textContent = `Hold (${secondsLeft}s)`;
-    
-    const interval = setInterval(() => {
-      secondsLeft--;
-      if (secondsLeft <= 0) {
-        clearInterval(interval);
-        isCooldown = false;
-        runBtn.disabled = false;
-        runBtn.textContent = 'Run assay';
-      } else {
-        runBtn.textContent = `Hold (${secondsLeft}s)`;
-      }
-    }, 1000);
-  }
-
-  async function run() {
-    if (isCooldown) return;
-    
-    const target = targetInput.value.trim();
-    const goal = goalInput.value.trim();
-    if (!target) {
-      targetInput.focus();
-      targetInput.style.borderColor = 'var(--error)';
-      setTimeout(() => { targetInput.style.borderColor = ''; }, 1200);
-      return;
-    }
-
-    outputEl.innerHTML = '';
-    startTicker();
-    
-    // Lock interaction elements instantly
-    runBtn.disabled = true;
-
-    const typeLabel = selectedType === 'auto' ? 'unspecified' : selectedType;
-
-    try {
-      const response = await fetch('/api/assay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target, goal, typeLabel })
-      });
-
-      if (!response.ok) throw new Error(`Server request failed (${response.status})`);
-
-      const parsed = await response.json();
-      const results = Array.isArray(parsed.results) ? parsed.results : [];
-      renderPayload(parsed.directResponse, results.filter(r => r && r.title && r.url));
-
-    } catch (err) {
-      showError('Something went wrong running the search: ' + err.message + '. Try again in a moment.');
-    } finally {
-      stopTicker();
-      handleCooldown(); // Engages the 5s hard button block safely after work finishes
-    }
-  }
-})();
-</script>
-</body>
-</html>
+        <input class="assay-input" id="assayTarget"
