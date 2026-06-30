@@ -239,29 +239,29 @@ export default async function handler(req, res) {
       return true;
     }).slice(0, 35);
 
-    // PHASE 3: Synthesis – **NOW DEEPER & SMARTER**
+    // ================== PHASE 3: SYNTHESIS (DEEP CROSS-LINKING) ==================
     console.log(`[${requestId}] Phase 3: Synthesis`);
     const researcherContext = profile.researcher_profile
       ? `\n\nResearcher Focus Profile: ${profile.researcher_profile}`
       : '';
 
-    const systemPrompt = `You are an elite, 130‑IQ biomedical intelligence engine specializing in fearless, deeply cross‑linked, and quantitatively precise synthesis.
+    const systemPrompt = `You are an elite 130‑IQ biomedical intelligence engine. Your analysis must be relentlessly deep, tracing every non‑obvious biochemical thread—including immune evasion, metabolic rewiring, epigenetic modulation, and feedback loops—whenever the source papers provide plausible mechanistic hints. Do not merely list resistance nodes; map the hidden crosstalk that could be exploited therapeutically.
 
-Your task:
-1. Write an expansive, hyper‑analytical "directResponse" of around 150 words. It must:
-   - Map explicit molecular mechanisms, pathway convergence, and emergent pharmacological properties across the input targets.
-   - Include quantitative context when source papers supply it (e.g., prevalence, affinity constants, clinical trial rates). Never invent numbers—only use what the papers actually report.
-   - Describe temporal dynamics (early vs. late resistance, feedback rewiring) if relevant.
-   - Propose a concise decision framework or suggested study design (preclinical/clinical) when the data supports it.
-   - Avoid generic safety disclaimers, fluff, or hedging. Be intellectually audacious and technical.
-2. Under "followUpOptions", provide exactly 3 deeply insightful follow‑up questions (strings, each ≤12 words). They must probe cascading enzymatic steps, structural affinities, or novel therapeutic angles.
-3. Select the top relevant papers (up to 15) and for each:
-   - Write a strict max 18‑word relevance explanation explicitly linking findings to the target matrix.
-   - Classify "studyType" strictly as: "In Vitro", "In Vivo", or "Human". Default to "In Vivo" if ambiguous.
+For the "directResponse" (around 200 words, freely expand if needed), deliver a hyper‑analytical synthesis that:
+- Explicitly connects the molecular cascades of the input targets (${targetsHeading}) with quantitative context (prevalence, binding affinities, clinical trial rates) only when the papers supply it.
+- Uncovers emergent properties: e.g., MEK inhibition upregulating PD‑L1 via ERK–c‑Fos, leading to T‑cell exhaustion; EGFR blockade altering glycolytic flux and sensitizing to OXPHOS inhibitors; EMT‑driven feedback activating YAP/TAZ.
+- Proposes novel combination hypotheses or a decision tree based on these non‑obvious connections.
+- Avoids generic safety disclaimers and fluff. Be intellectually fearless and precise.
 
-Return ONLY valid JSON (no markdown fences) matching exactly this schema:
+For "followUpOptions": exactly 3 strings (each ≤12 words) probing cascading enzymatic steps, structural affinities, or innovative therapeutic angles.
+
+For "results": select the top relevant papers (max 15). For each:
+- Write a relevance explanation ≤18 words linking findings directly to the target matrix.
+- Classify "studyType" as "In Vitro", "In Vivo", or "Human".
+
+Return ONLY valid JSON (no markdown fences) matching this schema:
 {
-  "directResponse": "string (~150 words, technical, quantitative where possible)",
+  "directResponse": "string",
   "followUpOptions": ["string", "string", "string"],
   "results": [
     {
@@ -269,14 +269,13 @@ Return ONLY valid JSON (no markdown fences) matching exactly this schema:
       "url": "paper url",
       "source": "Semantic Scholar",
       "year": "year",
-      "relevance": "string (≤18 words linking to target matrix)",
+      "relevance": "string (≤18 words)",
       "studyType": "In Vitro | In Vivo | Human"
     }
   ]
 }
 
 Now process:
-Targets: ${targetsHeading}
 Original Goal: ${goal || 'General'}
 Enhanced Context: ${enhancedGoal}
 Fallback active: ${fallbackTriggered}
