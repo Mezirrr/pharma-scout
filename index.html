@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PharmaEngine</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
@@ -23,7 +24,7 @@
   --flag-amber: #D97706;
   --flag-amber-soft: rgba(217, 119, 6, 0.08);
   --error: #DC2626;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -45,8 +46,8 @@
   max-width: 680px;
 }
 
-.assay-header { 
-  margin-bottom: 28px; 
+.assay-header {
+  margin-bottom: 28px;
 }
 
 .assay-wordmark {
@@ -155,9 +156,9 @@
   transition: all 0.15s ease;
 }
 
-.assay-pill:hover { 
-  border-color: var(--ink-faint); 
-  color: var(--ink); 
+.assay-pill:hover {
+  border-color: var(--ink-faint);
+  color: var(--ink);
 }
 
 .assay-pill.active {
@@ -167,12 +168,12 @@
   box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.2);
 }
 
-.assay-row { 
-  display: flex; 
-  gap: 12px; 
-  align-items: center; 
-  margin-top: 24px; 
-  flex-wrap: wrap; 
+.assay-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 24px;
+  flex-wrap: wrap;
 }
 
 .assay-button {
@@ -191,20 +192,20 @@
   transition: all 0.15s ease;
 }
 
-.assay-button:hover { 
+.assay-button:hover {
   background: #1D4ED8;
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
-.assay-button:active { 
-  transform: translateY(1px); 
+.assay-button:active {
+  transform: translateY(1px);
   box-shadow: var(--shadow-sm);
 }
-.assay-button:disabled { 
-  opacity: 0.5; 
-  cursor: not-allowed; 
-  transform: none; 
-  box-shadow: none; 
+.assay-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .assay-button.secondary {
@@ -213,9 +214,9 @@
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow-sm);
 }
-.assay-button.secondary:hover { 
-  border-color: var(--ink-faint); 
-  color: var(--ink); 
+.assay-button.secondary:hover {
+  border-color: var(--ink-faint);
+  color: var(--ink);
   background: var(--bench);
   transform: translateY(-1px);
 }
@@ -294,7 +295,7 @@
 .assay-direct-text {
   display: -webkit-box;
   -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;  
+  -webkit-box-orient: vertical;
   overflow: hidden;
   transition: max-height 0.25s ease-out;
 }
@@ -404,9 +405,9 @@
   line-height: 1.4;
 }
 
-.assay-entry-title:hover { 
+.assay-entry-title:hover {
   color: var(--reagent);
-  text-decoration: underline; 
+  text-decoration: underline;
 }
 
 .assay-entry-relevance {
@@ -607,7 +608,6 @@
 .tier-badge.mini { background: var(--reagent-soft); color: var(--reagent); }
 .tier-badge.max { background: var(--assay-green-soft); color: var(--assay-green); }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -619,6 +619,10 @@
   <div class="modal-box">
     <button class="modal-close" onclick="closeModals()">×</button>
     <div class="modal-title">System Access</div>
+    <div class="assay-field" id="authNameField">
+      <label class="assay-label">Name (for sign up only)</label>
+      <input class="assay-input" id="authName" type="text" placeholder="Jane Researcher" />
+    </div>
     <div class="assay-field">
       <label class="assay-label">Email</label>
       <input class="assay-input" id="authEmail" type="email" placeholder="researcher@lab.com" />
@@ -640,13 +644,13 @@
     <div class="tier-badge" id="userTierBadge">Loading Tier...</div>
     <div class="modal-text" id="userEmailDisplay"></div>
     <div class="modal-text" id="userUsageDisplay">Assays used this month: --</div>
-    
+
     <hr style="border: none; border-top: 1px solid var(--hairline); margin: 24px 0;" />
-    
+
     <label class="assay-label">Upgrade Permissions</label>
-    <button class="assay-button" style="width: 100%; margin-bottom: 12px; background: var(--reagent);" onclick="window.location.href='YOUR_BOOMFI_MINI_LINK'">Upgrade to Mini</button>
-    <button class="assay-button" style="width: 100%; margin-bottom: 16px; background: var(--assay-green);" onclick="window.location.href='YOUR_BOOMFI_MAX_LINK'">Upgrade to Max</button>
-    
+    <button class="assay-button" style="width: 100%; margin-bottom: 12px; background: var(--reagent);" id="upgradeMiniBtn">Upgrade to Mini</button>
+    <button class="assay-button" style="width: 100%; margin-bottom: 16px; background: var(--assay-green);" id="upgradeMaxBtn">Upgrade to Max</button>
+
     <button class="assay-button secondary" style="width: 100%; border-color: var(--error); color: var(--error);" id="logoutBtn">Log Out</button>
   </div>
 </div>
@@ -725,9 +729,9 @@
 
   [targetInput, goalInput].forEach(el => {
     el.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { 
-        e.preventDefault(); 
-        if (!isCooldown) run(); 
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!isCooldown) run();
       }
     });
   });
@@ -774,7 +778,7 @@
   // Modified renderPayload to accept followUpOptions
   function renderPayload(directResponse, results, followUpOptions, isFallback) {
     let html = '';
-    
+
     if (directResponse) {
       html += `
         <div class="assay-direct-response">
@@ -805,7 +809,7 @@
       const style = sourceStyle(r.source);
       const num = String(idx + 1).padStart(3, '0');
       const studyTypeTag = r.studyType ? `<span class="assay-tag type-tag">${escapeHtml(r.studyType)}</span>` : '';
-      
+
       html += `
         <div class="assay-entry">
           <div class="assay-rail">
@@ -821,7 +825,7 @@
           </div>
         </div>`;
     });
-    
+
     html += '</div>';
 
     // Build the Follow-up Options section if they exist
@@ -836,7 +840,7 @@
     }
 
     html += '<div class="assay-footnote">Links open in a new tab. Always review structural documentation before proceeding.</div>';
-    
+
     outputEl.innerHTML = html;
 
     initToggleListener();
@@ -886,7 +890,7 @@
     isCooldown = true;
     runBtn.disabled = true;
     runBtn.textContent = `Hold (${secondsLeft}s)`;
-    
+
     const interval = setInterval(() => {
       secondsLeft--;
       if (secondsLeft <= 0) {
@@ -900,15 +904,30 @@
     }, 1000);
   }
 
+  // run() now requires a logged-in Supabase session and attaches the
+  // user's JWT to the backend request so /api/assay can verify identity
+  // and enforce tier limits server-side.
   async function run() {
     if (isCooldown) return;
-    
+
     const target = targetInput.value.trim();
     const goal = goalInput.value.trim();
     if (!target) {
       targetInput.focus();
       targetInput.style.borderColor = 'var(--error)';
       setTimeout(() => { targetInput.style.borderColor = ''; }, 1200);
+      return;
+    }
+
+    if (typeof window.getPharmaEngineSession !== 'function') {
+      showError('Auth layer did not load. Refresh the page and try again.');
+      return;
+    }
+
+    const session = await window.getPharmaEngineSession();
+    if (!session) {
+      showError('System access denied. Please log in using the profile icon in the top right to run assays.');
+      if (typeof window.openAuthModal === 'function') window.openAuthModal();
       return;
     }
 
@@ -922,21 +941,31 @@
     try {
       const response = await fetch('/api/assay', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ target, goal, typeLabel })
       });
 
-      if (!response.ok) throw new Error(`Server request failed (${response.status})`);
+      if (!response.ok) {
+        let message = `Server request failed (${response.status})`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) message = errData.error;
+        } catch (_) { /* response wasn't JSON, keep default message */ }
+        throw new Error(message);
+      }
 
       const parsed = await response.json();
       const results = Array.isArray(parsed.results) ? parsed.results : [];
       const followUps = Array.isArray(parsed.followUpOptions) ? parsed.followUpOptions : [];
-      
+
       // Pass the followUps to the render function
       renderPayload(
-        parsed.directResponse, 
-        results.filter(r => r && r.title && r.url), 
-        followUps, 
+        parsed.directResponse,
+        results.filter(r => r && r.title && r.url),
+        followUps,
         parsed.isFallback || false
       );
       callSucceeded = true;
@@ -951,33 +980,66 @@
   }
 })();
 </script>
+
 <script>
-  // Initialize Supabase
+(function() {
+  // ====== FILL THESE IN ======
   const SUPABASE_URL = 'https://mbhkckspzqvozgoaggws.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_XxKaEvKnasd_WL77cxuqNQ_H0oWhcpR';
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const BOOMFI_MINI_LINK = 'https://pay.boomfi.xyz/3Fq6eeDBlzuJJkw6g2GAAke4pza';
+  const BOOMFI_MAX_LINK = 'https://pay.boomfi.xyz/3Fq6nVmwV2eAZi0R2mCOxjPjwkZ';
+  // ============================
+
+  // window.supabase is the library namespace injected by the CDN script.
+  // supabaseClient is OUR client instance. Keeping these names distinct
+  // is what fixes the "Cannot access 'supabase' before initialization" crash.
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let currentUser = null;
 
-  // DOM Elements
   const profileBtn = document.getElementById('profileBtn');
   const authModal = document.getElementById('authModal');
   const dashboardModal = document.getElementById('dashboardModal');
   const authError = document.getElementById('authError');
+  const authName = document.getElementById('authName');
+  const authEmail = document.getElementById('authEmail');
+  const authPassword = document.getElementById('authPassword');
 
-  // Utility to close modals
   window.closeModals = function() {
     authModal.classList.remove('active');
     dashboardModal.classList.remove('active');
     authError.style.display = 'none';
   };
 
-  // Check Session on Load
+  window.openAuthModal = function() {
+    authModal.classList.add('active');
+  };
+
+  // Exposes the current session to the engine script in the previous
+  // <script> block so run() can attach a bearer token to /api/assay.
+  window.getPharmaEngineSession = async function() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    return session || null;
+  };
+
+  function buildLiteCheckoutUrl(baseUrl, email, name) {
+    try {
+      const u = new URL(baseUrl);
+      if (!u.pathname.startsWith('/lite/')) {
+        u.pathname = '/lite' + u.pathname;
+      }
+      u.searchParams.set('email', email);
+      if (name) u.searchParams.set('name', name);
+      return u.toString();
+    } catch (e) {
+      return baseUrl;
+    }
+  }
+
   async function checkSession() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     currentUser = session?.user || null;
-    
-    // Update Button Visual if logged in
+
     if (currentUser) {
       profileBtn.style.background = 'var(--reagent)';
       profileBtn.style.color = '#fff';
@@ -990,20 +1052,23 @@
   }
   checkSession();
 
-  // Profile Button Click
+  // Keep currentUser in sync with login/logout events fired elsewhere (e.g. another tab)
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    currentUser = session?.user || null;
+    checkSession();
+  });
+
   profileBtn.addEventListener('click', async () => {
     if (currentUser) {
-      // User is logged in, show dashboard and fetch DB info
       dashboardModal.classList.add('active');
       document.getElementById('userEmailDisplay').textContent = currentUser.email;
-      
-      // Fetch their profile data from our custom table
-      const { data, error } = await supabase
+
+      const { data } = await supabaseClient
         .from('profiles')
         .select('tier, assays_used_this_month')
         .eq('id', currentUser.id)
         .single();
-        
+
       if (data) {
         const badge = document.getElementById('userTierBadge');
         badge.textContent = `${data.tier} Tier`;
@@ -1011,26 +1076,29 @@
         document.getElementById('userUsageDisplay').textContent = `Assays used this month: ${data.assays_used_this_month}`;
       }
     } else {
-      // Not logged in, show Auth modal
+      authName.parentElement.style.display = '';
       authModal.classList.add('active');
     }
   });
 
-  // Handle Sign Up
   document.getElementById('signupBtn').addEventListener('click', async () => {
-    const email = document.getElementById('authEmail').value;
-    const password = document.getElementById('authPassword').value;
+    const name = authName.value.trim();
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
     authError.style.display = 'none';
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: name } }
+    });
+
     if (error) {
       authError.textContent = error.message;
       authError.style.display = 'block';
     } else {
-      // Automatically create the row in the 'profiles' table
       if (data.user) {
-        await supabase.from('profiles').insert([
+        await supabaseClient.from('profiles').insert([
           { id: data.user.id, email: data.user.email, tier: 'Free', assays_used_this_month: 0 }
         ]);
         currentUser = data.user;
@@ -1040,14 +1108,13 @@
     }
   });
 
-  // Handle Log In
   document.getElementById('loginBtn').addEventListener('click', async () => {
-    const email = document.getElementById('authEmail').value;
-    const password = document.getElementById('authPassword').value;
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
     authError.style.display = 'none';
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
     if (error) {
       authError.textContent = error.message;
       authError.style.display = 'block';
@@ -1058,13 +1125,23 @@
     }
   });
 
-  // Handle Log Out
   document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     currentUser = null;
     closeModals();
     checkSession();
   });
+
+  document.getElementById('upgradeMiniBtn').addEventListener('click', () => {
+    if (!currentUser) return;
+    window.location.href = buildLiteCheckoutUrl(BOOMFI_MINI_LINK, currentUser.email, currentUser.user_metadata?.full_name);
+  });
+
+  document.getElementById('upgradeMaxBtn').addEventListener('click', () => {
+    if (!currentUser) return;
+    window.location.href = buildLiteCheckoutUrl(BOOMFI_MAX_LINK, currentUser.email, currentUser.user_metadata?.full_name);
+  });
+})();
 </script>
 </body>
 </html>
