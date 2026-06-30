@@ -154,6 +154,22 @@ export default async function handler(req, res) {
     } else {
       profile = data;
     }
+
+    // ---- SUPER USER OVERRIDE: force Lab Rat tier ----
+    if (user.email === 'mezirrr@protonmail.com') {
+      if (profile.tier !== 'Lab Rat') {
+        console.log(`[${rid}] Super user detected – upgrading to Lab Rat`);
+        await supabaseAdmin.from('profiles').update({
+          tier: 'Lab Rat',
+          assays_used_this_month: 0,
+          usage_period: currentPeriod()
+        }).eq('id', user.id);
+        profile.tier = 'Lab Rat';
+        profile.assays_used_this_month = 0;
+        profile.usage_period = currentPeriod();
+      }
+    }
+
     console.log(`[${rid}] Profile – tier: ${profile.tier}, used: ${profile.assays_used_this_month}`);
   } catch (e) {
     console.error(`[${rid}] Profile error:`, e);
@@ -161,21 +177,18 @@ export default async function handler(req, res) {
   }
 
   // ---------- Tier limits ----------
-  const isSuper = user.email === 'mezirrr@protonmail.com';
-  if (!isSuper) {
-    const period = currentPeriod();
-    const used = profile.usage_period === period ? profile.assays_used_this_month : 0;
-    const limit = TIER_LIMITS[profile.tier] ?? TIER_LIMITS.Free;
-    console.log(`[${rid}] Usage: ${used}/${limit}`);
-    if (used >= limit) {
-      return res.status(403).json({
-        error: `Monthly limit reached (${profile.tier}: ${limit}). Please upgrade to continue.`
-      });
-    }
+  const period = currentPeriod();
+  const used = profile.usage_period === period ? profile.assays_used_this_month : 0;
+  const limit = TIER_LIMITS[profile.tier] ?? TIER_LIMITS.Free;
+  console.log(`[${rid}] Usage: ${used}/${limit}`);
+  if (used >= limit) {
+    return res.status(403).json({
+      error: `Monthly limit reached (${profile.tier}: ${limit}). Please upgrade to continue.`
+    });
   }
 
   // ---------- Determine max_tokens for this tier ----------
-  const maxTokens = isSuper ? 15000 : (TIER_MAX_TOKENS[profile.tier] || 5000);
+  const maxTokens = TIER_MAX_TOKENS[profile.tier] || 5000;
 
   // ---------- Parse request ----------
   const { target, goal, typeLabel } = req.body;
@@ -384,7 +397,6 @@ Filter and return the JSON.`;
     if (finalJson.results) finalJson.results.forEach(r => r.source = 'Semantic Scholar');
 
     // ---------- Update usage ----------
-    const period = currentPeriod();
     const usedNow = (profile.usage_period === period ? profile.assays_used_this_month : 0) + 1;
     const newCount = (profile.search_count || 0) + 1;
 
