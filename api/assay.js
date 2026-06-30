@@ -167,18 +167,21 @@ export default async function handler(req, res) {
   const s2ApiKey = "s2k-zRgzPNUsqrylk6ST4j78YbPFDcq74woh6HR4Uawp";
 
   try {
-    // ================== PHASE 1: ENHANCER (multi-query) ==================
-    console.log(`[${requestId}] Phase 1: Enhancer (multi-query)`);
+    // ================== PHASE 1: ENHANCER (5 queries per target) ==================
+    console.log(`[${requestId}] Phase 1: Enhancer (multi-query, up to 5)`);
     let enhancedGoal = goal || 'General pharmacological profile';
     let optimizedQueries = {};
 
-    const enhancerSystem = `You are a biomedical search strategist. For each target, generate up to 3 complementary, high-yield search strings that capture different facets of the user's goal (e.g., mechanisms, case reports, related pathways). Use synonyms and broader/narrower terms to maximise recall.
-
-Return ONLY valid JSON:
+    const enhancerSystem = `You are a biomedical search strategist. For each target, generate exactly 5 complementary, high-yield search strings that capture different facets of the user's goal, including:
+- Direct target+mechanism combinations
+- Broader pathway/disease queries related to the goal (even without the target name)
+- Synonyms, alternative terminologies, and common abbreviations
+- Specific drug/model system names if relevant
+Make the queries diverse to maximise recall. Return ONLY valid JSON:
 {
   "enhancedGoal": "technical reframing of the overall goal (1-2 sentences)",
   "optimizedQueries": {
-    "TargetName": ["query string 1", "query string 2", ...]
+    "TargetName": ["query 1", "query 2", "query 3", "query 4", "query 5"]
   }
 }`;
 
@@ -221,17 +224,19 @@ Return ONLY valid JSON:
       }
     }
 
+    // Ensure each target has at least a raw fallback
     for (const t of targetsArray) {
       if (!optimizedQueries[t] || optimizedQueries[t].length === 0) {
         optimizedQueries[t] = [`${t} ${goal || ''}`.trim()];
       }
+      // Add raw target name as ultimate fallback if not present
       if (!optimizedQueries[t].includes(t)) {
         optimizedQueries[t].push(t);
       }
     }
 
     // ================== PHASE 2: SEMANTIC SCHOLAR ==================
-    console.log(`[${requestId}] Phase 2: S2 (multi-query)`);
+    console.log(`[${requestId}] Phase 2: S2 (multi-query, max 5 per target)`);
     let allPapers = [];
     let fallbackTriggered = false;
 
@@ -273,6 +278,50 @@ Return ONLY valid JSON:
       allPapers.push(...targetPapers);
     }
 
+    // ================== LAST‑DITCH ENHANCER if still zero papers ==================
+    if (allPapers.length === 0) {
+      console.log(`[${requestId}] Phase 2b: Last‑ditch AI query generation`);
+      try {
+        const lastRes = await fetchWithRetry('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-oss-120b',
+            messages: [
+              { role: 'system', content: 'You are a search expert. Given a biomedical goal and target, output a single, extremely effective search query string (max 15 words) that would find relevant scientific literature. Return ONLY the query string, no JSON, no extra text.' },
+              { role: 'user', content: `Targets: ${targetsHeading}\nGoal: ${goal || 'General info'}` }
+            ]
+          })
+        }, 1, 5000);
+
+        const lastData = await lastRes.json();
+        let lastQuery = lastData?.choices?.[0]?.message?.content?.trim();
+        if (lastQuery && lastQuery.length > 3) {
+          console.log(`[${requestId}] Last‑ditch query: "${lastQuery}"`);
+          // Respect rate limit
+          await new Promise(r => setTimeout(r, 1200));
+          const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(lastQuery)}&limit=10&fields=paperId,title,url,year,abstract`;
+          const s2Res = await fetchWithRetry(url, { headers: { 'x-api-key': s2ApiKey } }, 1, 6000);
+          const s2Data = await s2Res.json();
+          const papers = s2Data.data || [];
+          const mapped = papers.map(p => ({
+            title: p.title || 'Untitled',
+            url: p.url || (p.paperId ? `https://www.semanticscholar.org/paper/${p.paperId}` : ''),
+            year: p.year || 'Unknown',
+            abstract: p.abstract?.substring(0, 400) + '...' || '',
+            associatedTarget: targetsHeading // general
+          })).filter(p => p.url);
+          allPapers.push(...mapped);
+        }
+      } catch (e) {
+        console.warn(`[${requestId}] Last‑ditch enhancer failed:`, e.message);
+      }
+    }
+
+    // Deduplicate
     const seen = new Set();
     const uniquePapers = allPapers.filter(p => {
       if (!p.url || seen.has(p.url)) return false;
@@ -292,7 +341,7 @@ Return ONLY valid JSON:
 
 Your task:
 1. Under "directResponse", provide a hyper-analytical, flawlessly logical 130-IQ synthesis explaining the conceptual, structural, biochemical, or clinical connection between the user's targets (${targetsHeading}) and their discovery goal.
-   - **Start by identifying and explicitly detailing the primary, canonical molecular mechanism(s)** that most directly explain the observed effect (e.g., FGFR inhibition → STAT1/p21 suppression → chondrocyte proliferation). Use quantitative context if papers provide it.
+   - **Start by identifying and explicitly detailing the primary, canonical molecular mechanism(s)** that most directly explain the observed effect. Use quantitative context if papers provide it.
    - Then, freely map out explicit synergistic actions, shared metabolic pathways, or direct ligand-receptor convergence points that emerge from this primary axis. Explore feedback loops, hidden crosstalk, and emergent pharmacological properties.
    - Strike an authoritative, deeply academic, and highly technical tone. Avoid fluff, unnecessary introductory pleasantries, and thesaurus-bloat.
 2. Under "followUpOptions", provide exactly 3 deeply analytical, highly insightful follow-up questions (strings) investigating cascading enzymatic steps or structural affinities. Max 12 words each.
@@ -339,7 +388,6 @@ Filter and return the JSON.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ]
-        // No response_format — we parse JSON manually
       })
     }, 2, 12000);
 
