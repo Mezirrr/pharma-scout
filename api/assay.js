@@ -48,7 +48,7 @@ async function maybeUpdateResearcherProfile(userId, newSearchCount) {
     .map((s, i) => `${i + 1}. Target(s): ${s.target_searched} | Goal: ${s.goal_input || 'n/a'}`)
     .join('\n');
 
-  const system = `You write extremely terse researcher‑focus summaries. Given recent search queries, output ONLY a single plain‑text synthesis, ≤50 words. No preamble, no JSON.`;
+  const system = `You write extremely terse researcher‑focus summaries. Given recent search queries, output ONLY a single plain‑text synthesis, ≤150 words. No preamble, no JSON.`;
 
   try {
     const res = await fetchWithRetry('https://api.groq.com/openai/v1/chat/completions', {
@@ -76,12 +76,54 @@ async function maybeUpdateResearcherProfile(userId, newSearchCount) {
   }
 }
 
+// Robust JSON extraction: tries to fix common errors like trailing commas, unclosed braces
 function extractJSON(str) {
   let cleaned = str.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  // Remove any trailing whitespace/newlines
+  cleaned = cleaned.replace(/[\s\r\n]+$/g, '');
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
   if (firstBrace === -1 || lastBrace === -1) throw new Error('No JSON braces found');
-  return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+
+  let jsonStr = cleaned.slice(firstBrace, lastBrace + 1);
+  // Try to fix common errors: remove trailing commas before ] or }
+  jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+
+  // If still invalid, attempt to close unclosed arrays/objects by adding missing brackets
+  try {
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    // Attempt to close the JSON by appending a closing brace after the last valid token
+    const lastValidIndex = Math.max(
+      jsonStr.lastIndexOf(']'),
+      jsonStr.lastIndexOf('}'),
+      jsonStr.lastIndexOf('"'),
+      jsonStr.lastIndexOf(' ')
+    );
+    if (lastValidIndex > 0) {
+      const truncated = jsonStr.slice(0, lastValidIndex + 1);
+      // try to close the truncated string
+      const fixed = truncated.replace(/,\s*$/, '') + '}]';
+      try {
+        return JSON.parse(fixed);
+      } catch (e2) {
+        // If still fails, attempt to close all open brackets
+        const openBrackets = { '[': ']', '{': '}' };
+        const stack = [];
+        for (const char of truncated) {
+          if (char === '[' || char === '{') stack.push(char);
+          else if (char === ']' || char === '}') stack.pop();
+        }
+        let closedJson = truncated;
+        while (stack.length > 0) {
+          const opener = stack.pop();
+          closedJson += openBrackets[opener] || '';
+        }
+        return JSON.parse(closedJson);
+      }
+    }
+    throw e;
+  }
 }
 
 export default async function handler(req, res) {
@@ -167,21 +209,17 @@ export default async function handler(req, res) {
   const s2ApiKey = "s2k-zRgzPNUsqrylk6ST4j78YbPFDcq74woh6HR4Uawp";
 
   try {
-    // ================== PHASE 1: ENHANCER (5 queries per target) ==================
-    console.log(`[${requestId}] Phase 1: Enhancer (multi-query, up to 5)`);
+    // ================== PHASE 1: ENHANCER ==================
+    console.log(`[${requestId}] Phase 1: Enhancer`);
     let enhancedGoal = goal || 'General pharmacological profile';
     let optimizedQueries = {};
 
-    const enhancerSystem = `You are a biomedical search strategist. For each target, generate exactly 5 complementary, high-yield search strings that capture different facets of the user's goal, including:
-- Direct target+mechanism combinations
-- Broader pathway/disease queries related to the goal (even without the target name)
-- Synonyms, alternative terminologies, and common abbreviations
-- Specific drug/model system names if relevant
-Make the queries diverse to maximise recall. Return ONLY valid JSON:
+    const enhancerSystem = `You are a biomedical search strategist. For each target, generate up to 5 complementary, high-yield search strings that capture different facets of the user's goal.
+Return ONLY valid JSON:
 {
   "enhancedGoal": "technical reframing of the overall goal (1-2 sentences)",
   "optimizedQueries": {
-    "TargetName": ["query 1", "query 2", "query 3", "query 4", "query 5"]
+    "TargetName": ["query 1", "query 2", ...]
   }
 }`;
 
@@ -224,19 +262,17 @@ Make the queries diverse to maximise recall. Return ONLY valid JSON:
       }
     }
 
-    // Ensure each target has at least a raw fallback
     for (const t of targetsArray) {
       if (!optimizedQueries[t] || optimizedQueries[t].length === 0) {
         optimizedQueries[t] = [`${t} ${goal || ''}`.trim()];
       }
-      // Add raw target name as ultimate fallback if not present
       if (!optimizedQueries[t].includes(t)) {
         optimizedQueries[t].push(t);
       }
     }
 
     // ================== PHASE 2: SEMANTIC SCHOLAR ==================
-    console.log(`[${requestId}] Phase 2: S2 (multi-query, max 5 per target)`);
+    console.log(`[${requestId}] Phase 2: S2`);
     let allPapers = [];
     let fallbackTriggered = false;
 
@@ -278,9 +314,9 @@ Make the queries diverse to maximise recall. Return ONLY valid JSON:
       allPapers.push(...targetPapers);
     }
 
-    // ================== LAST‑DITCH ENHANCER if still zero papers ==================
+    // Last-ditch AI query if still zero
     if (allPapers.length === 0) {
-      console.log(`[${requestId}] Phase 2b: Last‑ditch AI query generation`);
+      console.log(`[${requestId}] Phase 2b: Last‑ditch query generation`);
       try {
         const lastRes = await fetchWithRetry('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -301,7 +337,6 @@ Make the queries diverse to maximise recall. Return ONLY valid JSON:
         let lastQuery = lastData?.choices?.[0]?.message?.content?.trim();
         if (lastQuery && lastQuery.length > 3) {
           console.log(`[${requestId}] Last‑ditch query: "${lastQuery}"`);
-          // Respect rate limit
           await new Promise(r => setTimeout(r, 1200));
           const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(lastQuery)}&limit=10&fields=paperId,title,url,year,abstract`;
           const s2Res = await fetchWithRetry(url, { headers: { 'x-api-key': s2ApiKey } }, 1, 6000);
@@ -312,7 +347,7 @@ Make the queries diverse to maximise recall. Return ONLY valid JSON:
             url: p.url || (p.paperId ? `https://www.semanticscholar.org/paper/${p.paperId}` : ''),
             year: p.year || 'Unknown',
             abstract: p.abstract?.substring(0, 400) + '...' || '',
-            associatedTarget: targetsHeading // general
+            associatedTarget: targetsHeading
           })).filter(p => p.url);
           allPapers.push(...mapped);
         }
@@ -321,7 +356,6 @@ Make the queries diverse to maximise recall. Return ONLY valid JSON:
       }
     }
 
-    // Deduplicate
     const seen = new Set();
     const uniquePapers = allPapers.filter(p => {
       if (!p.url || seen.has(p.url)) return false;
@@ -331,18 +365,18 @@ Make the queries diverse to maximise recall. Return ONLY valid JSON:
 
     console.log(`[${requestId}] Total unique papers: ${uniquePapers.length}`);
 
-    // ================== PHASE 3: SYNTHESIS (old prompt style + primary anchor) ==================
+    // ================== PHASE 3: SYNTHESIS (with max_tokens) ==================
     console.log(`[${requestId}] Phase 3: Synthesis`);
     const researcherContext = profile.researcher_profile
-      ? `\n\nKnown Researcher Focus Profile (derived from this user's last several searches — use it to silently tailor the depth/angle of your analysis and follow-up questions toward their underlying motive, but do not restate it verbatim): ${profile.researcher_profile}`
+      ? `\n\nKnown Researcher Focus Profile: ${profile.researcher_profile}`
       : '';
 
     const systemPrompt = `You are a 130-IQ, elite biochemical intelligence architecture specializing in cross-disciplinary synthesis and non-obvious mechanistic cross-linking.
 
 Your task:
 1. Under "directResponse", provide a hyper-analytical, flawlessly logical 130-IQ synthesis explaining the conceptual, structural, biochemical, or clinical connection between the user's targets (${targetsHeading}) and their discovery goal.
-   - **Start by identifying and explicitly detailing the primary, canonical molecular mechanism(s)** that most directly explain the observed effect. Use quantitative context if papers provide it.
-   - Then, freely map out explicit synergistic actions, shared metabolic pathways, or direct ligand-receptor convergence points that emerge from this primary axis. Explore feedback loops, hidden crosstalk, and emergent pharmacological properties.
+   - Start by identifying and explicitly detailing the primary, canonical molecular mechanism(s) that most directly explain the observed effect. Use quantitative context if papers provide it.
+   - Then, freely map out explicit synergistic actions, shared metabolic pathways, or direct ligand-receptor convergence points that emerge from this primary axis.
    - Strike an authoritative, deeply academic, and highly technical tone. Avoid fluff, unnecessary introductory pleasantries, and thesaurus-bloat.
 2. Under "followUpOptions", provide exactly 3 deeply analytical, highly insightful follow-up questions (strings) investigating cascading enzymatic steps or structural affinities. Max 12 words each.
 3. Select the top relevant papers (up to 15).
@@ -387,20 +421,23 @@ Filter and return the JSON.`;
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
-        ]
+        ],
+        max_tokens: 7500,         // enough to finish the JSON
+        temperature: 0.4           // reduce randomness to stay on schema
       })
     }, 2, 12000);
 
     const groqData = await groqRes.json();
     const rawText = groqData.choices[0].message.content;
     console.log(`[${requestId}] Groq raw (first 300):`, rawText.slice(0, 300));
+    console.log(`[${requestId}] Groq raw length:`, rawText.length);
 
     let finalJson;
     try {
       finalJson = extractJSON(rawText);
     } catch (e) {
       console.error(`[${requestId}] JSON parse failed:`, e.message);
-      console.error(`[${requestId}] Full:`, rawText);
+      console.error(`[${requestId}] Full raw:`, rawText);
       return res.status(500).json({ error: 'AI returned invalid format.' });
     }
 
