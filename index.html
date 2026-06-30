@@ -485,6 +485,17 @@
       font-size: 13px;
     }
 
+    .free-downgrade {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+    .free-downgrade a {
+      color: var(--accent);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
     .sci-hub-link {
       font-size: 13px;
       color: var(--text-faint);
@@ -636,7 +647,6 @@
       </div>
     </div>
 
-    <!-- Profile Page -->
     <div class="page" id="profilePage">
       <div class="card">
         <span class="back-link" id="backToAssay">← Back to Engine</span>
@@ -661,8 +671,11 @@
           </div>
 
           <div class="upgrade-card" id="upgradeSection">
-            <div class="upgrade-title">⚡ Upgrade Your Plan</div>
+            <div class="upgrade-title">⚡ Access More</div>
             <div id="tierOptions"></div>
+            <div class="free-downgrade" id="freeDowngrade" style="display:none;">
+              <a id="downgradeToFree">Switch to Free plan</a>
+            </div>
           </div>
 
           <hr>
@@ -713,22 +726,19 @@
       const SUPABASE_URL = 'https://mbhkckspzqvozgoaggws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1iaGtja3NwenF2b3pnb2FnZ3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NzU1MzgsImV4cCI6MjA5ODM1MTUzOH0.CDlcgRAmiyMhA4d20xajUDLWHzWg4iG0NFyI_W-GizE';
 
-      // New payment links
       const PAYMENT_LINKS = {
         Starter: 'https://pay.boomfi.xyz/3FrlWsKwMDESJ1J2l5uSPsbuSFf',
         Researcher: 'https://pay.boomfi.xyz/3FrlvM7EoqGUji2WoRw1dkTHoJo',
         'Lab Rat': 'https://pay.boomfi.xyz/3FrmBAuXkpfulxXGcgiaQSvTelI'
       };
 
-      // Tier metadata for the upgrade UI
       const TIER_META = {
         Free:       { runs: '3',   tokens: '5,000',  price: '$0',     desc: 'Basic access',               features: [] },
-        Starter:    { runs: '50',  tokens: '7,500',  price: '$9.99',  desc: '1.5× processing power',      features: ['50 runs/month'] },
-        Researcher: { runs: '200', tokens: '10,000', price: '$24.99', desc: '2× processing power',        features: ['200 runs/month', 'Export to CSV/PDF', 'History (30 days)'] },
-        'Lab Rat':  { runs: '∞',   tokens: '15,000', price: '$49.99', desc: '3× processing power',        features: ['Unlimited runs', 'Bulk CSV upload', 'History (180 days)'] }
+        Starter:    { runs: '50',  tokens: '7,500',  price: '$9.99',  desc: '1.5× processing power',      features: [] },
+        Researcher: { runs: '200', tokens: '10,000', price: '$24.99', desc: '2× processing power',        features: ['Export to CSV/PDF', 'History (30 days)'] },
+        'Lab Rat':  { runs: 'Unlimited',   tokens: '15,000', price: '$49.99', desc: '3× processing power',        features: ['Bulk CSV upload', 'History (180 days)'] }
       };
 
-      // Tier limits for usage display
       const TIER_LIMITS = { Free: 3, Starter: 50, Researcher: 200, 'Lab Rat': 999999 };
 
       const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -752,7 +762,6 @@
 
       let selectedType = 'auto';
 
-      // Dark mode
       function applyTheme(dark) {
         if (dark) {
           document.body.classList.add('dark');
@@ -799,29 +808,38 @@
 
       function renderTierOptions(currentTier) {
         const container = document.getElementById('tierOptions');
+        const freeDowngrade = document.getElementById('freeDowngrade');
         if (!container) return;
 
-        const tiers = ['Free', 'Starter', 'Researcher', 'Lab Rat'];
+        const paidTiers = ['Starter', 'Researcher', 'Lab Rat'];
         let html = '';
-        tiers.forEach(tier => {
+        paidTiers.forEach(tier => {
           const meta = TIER_META[tier];
           const isCurrent = currentTier === tier;
           html += `
             <div class="tier-option ${isCurrent ? 'current' : ''}">
               <div class="tier-info">
                 <div class="tier-name">${tier}</div>
-                <div class="tier-desc">${meta.desc} · ${meta.runs} runs/mo · ${meta.tokens} max tokens</div>
+                <div class="tier-desc">${meta.desc} · ${meta.runs} runs/month · ${meta.tokens} max tokens</div>
                 ${meta.features.length ? '<div class="tier-desc" style="margin-top:4px;">' + meta.features.join(' · ') + '</div>' : ''}
               </div>
               <div style="text-align:right; flex-shrink:0; margin-left:16px;">
                 <div class="tier-price">${meta.price}/mo</div>
-                ${!isCurrent && tier !== 'Free' ? `<button class="btn btn-primary btn-sm upgrade-btn" data-tier="${tier}">Upgrade</button>` : (isCurrent ? '<span class="current-badge">Current</span>' : '')}
+                ${!isCurrent ? `<button class="btn btn-primary btn-sm upgrade-btn" data-tier="${tier}">Upgrade</button>` : '<span class="current-badge">Current</span>'}
               </div>
             </div>
           `;
         });
         container.innerHTML = html;
 
+        // Show/hide Free downgrade link
+        if (currentTier !== 'Free') {
+          freeDowngrade.style.display = 'block';
+        } else {
+          freeDowngrade.style.display = 'none';
+        }
+
+        // Upgrade buttons
         container.querySelectorAll('.upgrade-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             const tier = btn.dataset.tier;
@@ -831,6 +849,28 @@
             if (currentUser.user_metadata?.full_name) url.searchParams.set('name', currentUser.user_metadata.full_name);
             window.location.href = url.toString();
           });
+        });
+
+        // Downgrade to Free
+        document.getElementById('downgradeToFree').addEventListener('click', async () => {
+          if (!currentUser) return;
+          const session = await getSession();
+          if (!session) return showToast('Please log in again.');
+          try {
+            const res = await fetch('/api/set-tier', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({ tier: 'Free' })
+            });
+            if (!res.ok) throw new Error('Failed');
+            showToast('Downgraded to Free plan.', 3000);
+            await updateProfileUI();
+          } catch (e) {
+            showToast('Could not downgrade. Try again.', 3000);
+          }
         });
       }
 
@@ -1176,7 +1216,6 @@
         }
       }
 
-      // Email confirm & share
       window.addEventListener('load', async () => {
         const hash = location.hash;
         if (hash.includes('access_token')) {
