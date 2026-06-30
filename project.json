@@ -1,0 +1,10 @@
+{
+  "name": "pharmaengine",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.html",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
