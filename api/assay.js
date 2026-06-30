@@ -215,13 +215,12 @@ Return ONLY valid JSON:
         }
       }
     } catch (e) {
-      console.warn(`[${requestId}] Enhancer failed, fallback:`, e.message);
+      console.warn(`[${requestId}] Enhancer fallback:`, e.message);
       for (const t of targetsArray) {
         optimizedQueries[t] = [`${t} ${goal || ''}`.trim()];
       }
     }
 
-    // Ensure every target has at least one query and a raw name fallback
     for (const t of targetsArray) {
       if (!optimizedQueries[t] || optimizedQueries[t].length === 0) {
         optimizedQueries[t] = [`${t} ${goal || ''}`.trim()];
@@ -231,7 +230,7 @@ Return ONLY valid JSON:
       }
     }
 
-    // ================== PHASE 2: SEMANTIC SCHOLAR (multi-query) ==================
+    // ================== PHASE 2: SEMANTIC SCHOLAR ==================
     console.log(`[${requestId}] Phase 2: S2 (multi-query)`);
     let allPapers = [];
     let fallbackTriggered = false;
@@ -242,7 +241,6 @@ Return ONLY valid JSON:
 
       for (let qi = 0; qi < queries.length; qi++) {
         if (qi > 0) await new Promise(r => setTimeout(r, 1200));
-
         const query = queries[qi];
         console.log(`[${requestId}] S2 query ${qi + 1}/${queries.length} for "${target}": "${query}"`);
         const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=paperId,title,url,year,abstract`;
@@ -284,49 +282,50 @@ Return ONLY valid JSON:
 
     console.log(`[${requestId}] Total unique papers: ${uniquePapers.length}`);
 
-    // ================== PHASE 3: SYNTHESIS (grounded, primary-mechanism-first) ==================
-    console.log(`[${requestId}] Phase 3: Synthesis (canonical mechanism anchored)`);
+    // ================== PHASE 3: SYNTHESIS (old prompt style + primary anchor) ==================
+    console.log(`[${requestId}] Phase 3: Synthesis`);
     const researcherContext = profile.researcher_profile
-      ? `\n\nResearcher Focus Profile: ${profile.researcher_profile}`
+      ? `\n\nKnown Researcher Focus Profile (derived from this user's last several searches — use it to silently tailor the depth/angle of your analysis and follow-up questions toward their underlying motive, but do not restate it verbatim): ${profile.researcher_profile}`
       : '';
 
-    const systemPrompt = `You are an elite 130‑IQ biomedical intelligence engine. Your analysis must be relentlessly precise and anchored in the most well‑established, canonical molecular mechanisms first—only then may you expand into secondary, less direct crosstalk if the source papers clearly support it. Do not invent elaborate pathways that are not the primary drivers of the observed effect.
+    const systemPrompt = `You are a 130-IQ, elite biochemical intelligence architecture specializing in cross-disciplinary synthesis and non-obvious mechanistic cross-linking.
 
-For the "directResponse" (around 200 words, freely expand if needed):
-1. **Identify and deeply explain the primary molecular mechanism(s)** linking the input targets (${targetsHeading}) to the user’s goal. Use quantitative context (prevalence, binding affinities, clinical rates) only when the papers supply it.
-2. **Explain how this mechanism directly produces the observed outcome** (e.g., FGFR inhibition → reduced STAT1/p21 activity → chondrocyte proliferation → bone overgrowth).
-3. **Then**, and only then, mention secondary contributing pathways (e.g., MAPK feedback, metabolic shifts, epigenetic changes) if they are actually evidenced in the supplied papers and relevant. Do not treat tangential links as central.
-4. Propose a concise decision framework or therapeutic hypothesis based on the primary mechanism, with potential secondary nodes if supported.
-5. Avoid generic safety disclaimers, fluff, or hedging. Be intellectually fearless but must stay true to the literature.
+Your task:
+1. Under "directResponse", provide a hyper-analytical, flawlessly logical 130-IQ synthesis explaining the conceptual, structural, biochemical, or clinical connection between the user's targets (${targetsHeading}) and their discovery goal.
+   - **Start by identifying and explicitly detailing the primary, canonical molecular mechanism(s)** that most directly explain the observed effect (e.g., FGFR inhibition → STAT1/p21 suppression → chondrocyte proliferation). Use quantitative context if papers provide it.
+   - Then, freely map out explicit synergistic actions, shared metabolic pathways, or direct ligand-receptor convergence points that emerge from this primary axis. Explore feedback loops, hidden crosstalk, and emergent pharmacological properties.
+   - Strike an authoritative, deeply academic, and highly technical tone. Avoid fluff, unnecessary introductory pleasantries, and thesaurus-bloat.
+2. Under "followUpOptions", provide exactly 3 deeply analytical, highly insightful follow-up questions (strings) investigating cascading enzymatic steps or structural affinities. Max 12 words each.
+3. Select the top relevant papers (up to 15).
+   - Write a strict max 18-word "relevance" explanation for each, explicitly linking its findings to the target matrix.
+   - Classify "studyType" strictly as: "In Vitro", "In Vivo", or "Human". Default to "In Vivo" if ambiguous.
 
-For "followUpOptions": exactly 3 strings (each ≤12 words) probing cascading enzymatic steps, structural affinities, or innovative therapeutic angles that arise from the primary mechanism.
-
-For "results": select the top relevant papers (max 15). For each:
-- Write a relevance explanation ≤18 words linking findings directly to the target matrix.
-- Classify "studyType" as "In Vitro", "In Vivo", or "Human".
-
-Return ONLY valid JSON (no markdown fences) matching this schema:
+Respond with ONLY raw JSON matching exactly this schema:
 {
   "directResponse": "string",
   "followUpOptions": ["string", "string", "string"],
   "results": [
     {
-      "title": "paper title",
-      "url": "paper url",
+      "title": "string",
+      "url": "string",
       "source": "Semantic Scholar",
-      "year": "year",
-      "relevance": "string (≤18 words)",
+      "year": "string",
+      "relevance": "string",
       "studyType": "In Vitro | In Vivo | Human"
     }
   ]
-}
+}${researcherContext}`;
 
-Now process:
-Original Goal: ${goal || 'General'}
-Enhanced Context: ${enhancedGoal}
-Fallback active: ${fallbackTriggered}
-Papers: ${JSON.stringify(uniquePapers)}
-${researcherContext}`;
+    const userPrompt = `Target type: ${typeLabel || 'unspecified'}
+All Inputs Requested: ${targetsHeading}
+Original Goal: ${goal || 'General info'}
+Enhanced Analytical Context: ${enhancedGoal}
+Is Fallback Broad Search Active: ${fallbackTriggered}
+
+Here are the real compiled papers found across targets:
+${JSON.stringify(uniquePapers, null, 2)}
+
+Filter and return the JSON.`;
 
     const groqRes = await fetchWithRetry('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -338,8 +337,9 @@ ${researcherContext}`;
         model: 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: 'Filter and return JSON.' }
+          { role: 'user', content: userPrompt }
         ]
+        // No response_format — we parse JSON manually
       })
     }, 2, 12000);
 
