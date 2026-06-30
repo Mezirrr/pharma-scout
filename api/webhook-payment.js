@@ -24,7 +24,7 @@ function verifySignature(message, signatureBase64, publicKeyPem) {
     verifier.end();
     return verifier.verify(publicKeyPem, signatureBase64, 'base64');
   } catch (e) {
-    console.error('Sig verification error:', e.message);
+    console.error('Signature verification error:', e.message);
     return false;
   }
 }
@@ -69,28 +69,38 @@ export default async function handler(req, res) {
     return res.status(200).json({ received: true, ignored: true });
   }
 
-  const email = payload.customer?.email;
-  const planRef = payload.plan?.reference;
-  if (!email) return res.status(200).json({ received: true, ignored: true });
+  const customerEmail = payload.customer?.email;
+  const planReference = payload.plan?.reference;
 
+  if (!customerEmail) return res.status(200).json({ received: true, ignored: true });
+
+  // New tier mapping
   let tier = null;
-  if (planRef === process.env.BOOMFI_MINI_PLAN_REFERENCE) tier = 'Mini';
-  if (process.env.BOOMFI_MAX_PLAN_REFERENCE && planRef === process.env.BOOMFI_MAX_PLAN_REFERENCE) tier = 'Max';
-  if (!tier) return res.status(200).json({ received: true, ignored: true });
+  if (planReference === 'starter-sub') tier = 'Starter';
+  else if (planReference === 'researcher-sub') tier = 'Researcher';
+  else if (planReference === 'labrat-sub') tier = 'Lab Rat';
+
+  if (!tier) {
+    console.warn('Webhook plan reference did not match a known tier:', planReference);
+    return res.status(200).json({ received: true, ignored: true });
+  }
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('id')
-    .eq('email', email)
+    .eq('email', customerEmail)
     .single();
 
   if (!profile) return res.status(200).json({ received: true, matched: false });
 
-  await supabaseAdmin.from('profiles').update({
-    tier,
-    assays_used_this_month: 0,
-    usage_period: currentPeriod()
-  }).eq('id', profile.id);
+  await supabaseAdmin
+    .from('profiles')
+    .update({
+      tier,
+      assays_used_this_month: 0,
+      usage_period: currentPeriod()
+    })
+    .eq('id', profile.id);
 
   return res.status(200).json({ received: true, matched: true, tier });
 }
