@@ -5,10 +5,11 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const TIER_LIMITS = { Free: 5, Mini: 50, Max: 1000 };
+// Tier limits – Free now 10, plus hidden super-user
+const TIER_LIMITS = { Free: 10, Mini: 50, Max: 1000 };
 const PROFILE_SYNTHESIS_EVERY = 5;
 
-// Smart fetch with timeout & retry
+// Smart fetch with timeout & retry (unchanged)
 async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 8000) {
   for (let i = 0; i <= retries; i++) {
     const controller = new AbortController();
@@ -16,7 +17,10 @@ async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 8000) 
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`HTTP ${response.status} – ${body.slice(0, 200)}`);
+      }
       return response;
     } catch (error) {
       clearTimeout(timeoutId);
@@ -31,6 +35,7 @@ function currentPeriod() {
 }
 
 async function maybeUpdateResearcherProfile(userId, newSearchCount) {
+  // ... (unchanged, but now with error logging)
   if (newSearchCount % PROFILE_SYNTHESIS_EVERY !== 0) return;
 
   const { data: recent } = await supabaseAdmin
@@ -61,7 +66,6 @@ async function maybeUpdateResearcherProfile(userId, newSearchCount) {
           { role: 'system', content: system },
           { role: 'user', content: historyText }
         ]
-        // No response_format
       })
     }, 1, 6000);
 
@@ -71,51 +75,112 @@ async function maybeUpdateResearcherProfile(userId, newSearchCount) {
       await supabaseAdmin.from('profiles').update({ researcher_profile: synth }).eq('id', userId);
     }
   } catch (e) {
-    console.warn('Profile synthesis skipped:', e.message);
+    console.error('Profile synthesis failed (non-critical):', e.message);
   }
 }
 
+// Helper to extract JSON from a string that might contain markdown fences
+function extractJSON(str) {
+  // Remove possible markdown code fences
+  let cleaned = str.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  // Find the outermost { ... }
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1) throw new Error('No JSON braces found');
+  return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  // ---------------------------- LOGGING HEADER ----------------------------
+  const requestId = Math.random().toString(36).slice(2, 8);
+  console.log(`[${requestId}] Incoming assay request`);
+
+  if (req.method !== 'POST') {
+    console.warn(`[${requestId}] Wrong method`);
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   // 1. Auth
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Authentication required.' });
+  if (!authHeader) {
+    console.warn(`[${requestId}] No Authorization header`);
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
 
   const token = authHeader.replace('Bearer ', '');
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) return res.status(401).json({ error: 'Invalid session.' });
+  console.log(`[${requestId}] Verifying token...`);
 
-  // 2. Profile
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  let user;
+  try {
+    const { data, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !data.user) {
+      console.error(`[${requestId}] Auth error:`, authError);
+      return res.status(401).json({ error: 'Invalid session.' });
+    }
+    user = data.user;
+    console.log(`[${requestId}] Auth OK – user: ${user.email}`);
+  } catch (e) {
+    console.error(`[${requestId}] Auth exception:`, e);
+    return res.status(500).json({ error: 'Authentication service error.' });
+  }
 
-  if (profileError || !profile) return res.status(403).json({ error: 'Profile not found.' });
+  // 2. Profile lookup
+  let profile;
+  try {
+    const { data, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    if (profileError || !data) {
+      console.error(`[${requestId}] Profile missing:`, profileError);
+      return res.status(403).json({ error: 'Profile not found.' });
+    }
+    profile = data;
+    console.log(`[${requestId}] Profile loaded – tier: ${profile.tier}, used: ${profile.assays_used_this_month}`);
+  } catch (e) {
+    console.error(`[${requestId}] Profile fetch exception:`, e);
+    return res.status(500).json({ error: 'Database error.' });
+  }
 
-  // 3. Tier limit
-  const period = currentPeriod();
-  const usedThisMonth = profile.usage_period === period ? profile.assays_used_this_month : 0;
-  const limit = TIER_LIMITS[profile.tier] || TIER_LIMITS.Free;
-  if (usedThisMonth >= limit) {
-    return res.status(403).json({
-      error: `Limit reached (${profile.tier} tier: ${limit}/month). Please upgrade.`
-    });
+  // ==== Hidden unlimited access for special email ====
+  const isSuperUser = (user.email === 'mezirrr@protonmail.com');
+  if (isSuperUser) {
+    console.log(`[${requestId}] Super user detected – bypassing tier limits.`);
+  }
+
+  // 3. Tier limit check (skip if super user)
+  if (!isSuperUser) {
+    const period = currentPeriod();
+    const usedThisMonth = profile.usage_period === period ? profile.assays_used_this_month : 0;
+    const limit = TIER_LIMITS[profile.tier] || TIER_LIMITS.Free;
+    console.log(`[${requestId}] Usage: ${usedThisMonth}/${limit} (period ${period})`);
+    if (usedThisMonth >= limit) {
+      console.warn(`[${requestId}] Limit exceeded`);
+      return res.status(403).json({
+        error: `Monthly limit reached (${profile.tier}: ${limit}). Please upgrade.`
+      });
+    }
   }
 
   const { target, goal, typeLabel } = req.body;
-  if (!target) return res.status(400).json({ error: 'No target provided.' });
+  if (!target) {
+    console.warn(`[${requestId}] No target in body`);
+    return res.status(400).json({ error: 'No target provided.' });
+  }
 
   const targetsArray = target.split(',').map(t => t.trim()).filter(Boolean);
-  if (!targetsArray.length) return res.status(400).json({ error: 'No valid targets.' });
+  if (targetsArray.length === 0) {
+    console.warn(`[${requestId}] Empty targets array`);
+    return res.status(400).json({ error: 'No valid targets.' });
+  }
 
   const targetsHeading = targetsArray.join(', ');
   const s2ApiKey = "s2k-zRgzPNUsqrylk6ST4j78YbPFDcq74woh6HR4Uawp";
 
   try {
     // ===================== PHASE 1: Enhancer =====================
+    console.log(`[${requestId}] Phase 1: Enhancer start`);
     let enhancedGoal = goal || 'General pharmacological profile';
     let optimizedQueries = {};
 
@@ -140,41 +205,47 @@ export default async function handler(req, res) {
             { role: 'system', content: enhancerSystem },
             { role: 'user', content: enhancerUser }
           ]
-          // No response_format – we parse the JSON manually
         })
       }, 2, 6000);
 
       const enhData = await enhRes.json();
+      console.log(`[${requestId}] Enhancer response received`);
       const raw = enhData.choices[0].message.content.trim();
-      // Find the JSON object inside the response (just in case there's extra text)
-      const jsonStart = raw.indexOf('{');
-      const jsonEnd = raw.lastIndexOf('}') + 1;
-      if (jsonStart !== -1 && jsonEnd > jsonStart) {
-        const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd));
+      console.log(`[${requestId}] Enhancer raw (first 200 chars):`, raw.slice(0, 200));
+
+      try {
+        const parsed = extractJSON(raw);
         enhancedGoal = parsed.enhancedGoal || enhancedGoal;
         optimizedQueries = parsed.optimizedQueries || {};
+        console.log(`[${requestId}] Enhancer parsed OK`);
+      } catch (parseErr) {
+        console.warn(`[${requestId}] Enhancer JSON parse failed, using defaults:`, parseErr.message);
       }
     } catch (e) {
-      console.warn('Enhancer failed, using raw input:', e.message);
+      console.error(`[${requestId}] Enhancer network error:`, e.message);
+      // Continue with defaults
     }
 
     // ===================== PHASE 2: Semantic Scholar =====================
+    console.log(`[${requestId}] Phase 2: Semantic Scholar`);
     let allPapers = [];
     let fallbackTriggered = false;
 
     for (let i = 0; i < targetsArray.length; i++) {
       const singleTarget = targetsArray[i];
-      if (i > 0) await new Promise(r => setTimeout(r, 1200)); // rate limit
+      if (i > 0) await new Promise(r => setTimeout(r, 1200));
 
       let query = optimizedQueries[singleTarget] || `${singleTarget} ${enhancedGoal}`;
       let s2Url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=15&fields=paperId,title,url,year,abstract`;
 
       try {
+        console.log(`[${requestId}] S2 query for "${singleTarget}"`);
         let s2Res = await fetchWithRetry(s2Url, { headers: { 'x-api-key': s2ApiKey } }, 1, 6000);
         let s2Data = await s2Res.json();
         let papers = s2Data.data || [];
 
         if (papers.length === 0) {
+          console.log(`[${requestId}] No results, trying fallback`);
           fallbackTriggered = true;
           await new Promise(r => setTimeout(r, 1200));
           const fallbackUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(singleTarget)}&limit=15&fields=paperId,title,url,year,abstract`;
@@ -193,7 +264,7 @@ export default async function handler(req, res) {
 
         allPapers.push(...mapped);
       } catch (err) {
-        console.warn(`S2 fetch failed for ${singleTarget}:`, err.message);
+        console.error(`[${requestId}] S2 fetch failed for "${singleTarget}":`, err.message);
       }
     }
 
@@ -204,8 +275,10 @@ export default async function handler(req, res) {
       seen.add(p.url);
       return true;
     }).slice(0, 35);
+    console.log(`[${requestId}] Total unique papers after dedup: ${uniquePapers.length}`);
 
     // ===================== PHASE 3: Synthesis =====================
+    console.log(`[${requestId}] Phase 3: Synthesis`);
     const researcherContext = profile.researcher_profile
       ? `\n\nResearcher Focus Profile (use to bias analysis subtly): ${profile.researcher_profile}`
       : '';
@@ -244,24 +317,37 @@ ${researcherContext}`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: 'Filter and return JSON.' }
         ]
-        // No response_format – we parse the JSON manually
       })
     }, 2, 12000);
 
     const groqData = await groqRes.json();
+    console.log(`[${requestId}] Groq synthesis response received`);
     const rawText = groqData.choices[0].message.content.trim();
-    const jsonStart = rawText.indexOf('{');
-    const jsonEnd = rawText.lastIndexOf('}') + 1;
-    if (jsonStart === -1 || jsonEnd <= jsonStart) throw new Error('Groq did not return valid JSON.');
+    console.log(`[${requestId}] Groq raw (first 300 chars):`, rawText.slice(0, 300));
 
-    const finalJson = JSON.parse(rawText.slice(jsonStart, jsonEnd));
+    let finalJson;
+    try {
+      finalJson = extractJSON(rawText);
+      console.log(`[${requestId}] JSON parsed successfully`);
+    } catch (parseErr) {
+      console.error(`[${requestId}] Groq JSON parse failed:`, parseErr.message);
+      console.error(`[${requestId}] Full raw response:`, rawText);
+      return res.status(500).json({
+        error: 'AI returned invalid data format. Please try again.'
+      });
+    }
+
     finalJson.isFallback = fallbackTriggered;
     if (finalJson.results) {
       finalJson.results.forEach(r => { r.source = 'Semantic Scholar'; });
     }
 
     // ===================== UPDATE USAGE =====================
+    const period = currentPeriod();
+    const usedThisMonth = (profile.usage_period === period ? profile.assays_used_this_month : 0);
     const newCount = (profile.search_count || 0) + 1;
+
+    console.log(`[${requestId}] Updating usage: +1, total this month ${usedThisMonth + 1}`);
     await supabaseAdmin.from('profiles').update({
       assays_used_this_month: usedThisMonth + 1,
       usage_period: period,
@@ -274,14 +360,19 @@ ${researcherContext}`;
       goal_input: goal
     }]);
 
-    await maybeUpdateResearcherProfile(user.id, newCount);
+    // Non-blocking profile synthesis
+    maybeUpdateResearcherProfile(user.id, newCount).catch(e =>
+      console.error(`[${requestId}] Profile synthesis error:`, e.message)
+    );
 
+    console.log(`[${requestId}] Done – returning 200`);
     return res.status(200).json(finalJson);
 
   } catch (error) {
-    console.error('Pipeline error:', error);
+    console.error(`[${requestId}] ❌ UNHANDLED EXCEPTION:`, error);
+    console.error(`[${requestId}] Stack:`, error.stack);
     return res.status(500).json({
-      error: 'The analysis pipeline failed. Please try again later.'
+      error: `Pipeline error: ${error.message.slice(0, 150)}`
     });
   }
 }
