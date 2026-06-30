@@ -832,14 +832,12 @@
         });
         container.innerHTML = html;
 
-        // Show/hide Free downgrade link
         if (currentTier !== 'Free') {
           freeDowngrade.style.display = 'block';
         } else {
           freeDowngrade.style.display = 'none';
         }
 
-        // Upgrade buttons
         container.querySelectorAll('.upgrade-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             const tier = btn.dataset.tier;
@@ -851,7 +849,6 @@
           });
         });
 
-        // Downgrade to Free with confirmation
         document.getElementById('downgradeToFree').addEventListener('click', async () => {
           if (!currentUser) return;
           if (!confirm('Are you sure? You will lose all your current plan benefits (more runs, higher tokens, extra features).')) return;
@@ -1063,15 +1060,59 @@
         return d.innerHTML;
       }
 
-      function typeWriter(el, text, speed, callback) {
-        let i=0;
+      // Parse **bold** into <strong> tags while escaping the rest
+      function parseBold(text) {
+        // Split by the ** markers, escaping each piece and wrapping bold parts in <strong>
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        return parts.map(part => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return '<strong>' + escapeHtml(part.slice(2, -2)) + '</strong>';
+          } else {
+            return escapeHtml(part);
+          }
+        }).join('');
+      }
+
+      // Typewriter that handles HTML tags (preserves them as whole tokens)
+      function typeWriter(el, html, speed, callback) {
+        let i = 0;
         el.innerHTML = '';
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        // Flatten the DOM to a string of characters and tags
+        const tokens = [];
+        function tokenize(node) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            for (const char of node.textContent) {
+              tokens.push(char);
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            tokens.push(node.outerHTML);
+          }
+        }
+        // Walk the child nodes
+        const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_ALL);
+        while (walker.nextNode()) {
+          tokenize(walker.currentNode);
+        }
+
         function type() {
-          if (i < text.length) {
-            el.innerHTML += text.charAt(i);
-            i++;
-            setTimeout(type, speed);
-          } else if (callback) callback();
+          if (i < tokens.length) {
+            const token = tokens[i];
+            if (token.startsWith('<')) {
+              // It's an HTML tag – insert as a whole chunk without escaping
+              el.innerHTML += token;
+              i++;
+              // Skip the subtree content that is already inside the tag? No, the token is the whole tag, so we're good.
+              setTimeout(type, speed);
+            } else {
+              el.innerHTML += token;
+              i++;
+              setTimeout(type, speed);
+            }
+          } else if (callback) {
+            callback();
+          }
         }
         type();
       }
@@ -1092,7 +1133,7 @@
           outputArea.innerHTML = html;
           if (directResponse) {
             const directEl = document.getElementById('directText');
-            typeWriter(directEl, directResponse, 3);
+            typeWriter(directEl, parseBold(directResponse), 3);
             bindToggle();
           }
           return;
@@ -1137,7 +1178,7 @@
 
         if (directResponse) {
           const directEl = document.getElementById('directText');
-          typeWriter(directEl, directResponse, 3);
+          typeWriter(directEl, parseBold(directResponse), 3);
           bindToggle();
         }
 
@@ -1246,7 +1287,7 @@
 
       function renderSharedReport(dr, results) {
         let html = '';
-        if (dr) html += `<div class="card" style="border-left:4px solid var(--accent);"><div class="label" style="color:var(--accent);">Shared Report</div><div>${escapeHtml(dr)}</div></div>`;
+        if (dr) html += `<div class="card" style="border-left:4px solid var(--accent);"><div class="label" style="color:var(--accent);">Shared Report</div><div>${parseBold(dr)}</div></div>`;
         if (results?.length) {
           html += `<div style="margin-top:16px;"><span style="font-family:monospace; font-size:12px; color:var(--text-secondary);">${results.length} results</span></div>`;
           results.forEach((r,idx)=>{
