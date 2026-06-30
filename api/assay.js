@@ -6,7 +6,7 @@ const TIER_LIMITS = {
   Free: 3,
   Starter: 50,
   Researcher: 200,
-  'Lab Rat': 999999   // effectively unlimited
+  'Lab Rat': 999999
 };
 
 const TIER_MAX_TOKENS = {
@@ -109,7 +109,6 @@ export default async function handler(req, res) {
   console.log(`[${rid}] Incoming assay request`);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // ---------- Auth ----------
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Authentication required.' });
   const token = authHeader.replace('Bearer ', '');
@@ -134,7 +133,6 @@ export default async function handler(req, res) {
       .single();
 
     if (error && error.code === 'PGRST116') {
-      // Auto‑create default Free profile
       await supabaseAdmin.from('profiles').insert({
         id: user.id,
         email: user.email,
@@ -155,7 +153,7 @@ export default async function handler(req, res) {
       profile = data;
     }
 
-    // ---- SUPER USER OVERRIDE: force Lab Rat tier ----
+    // Super user always gets Lab Rat
     if (user.email === 'mezirrr@protonmail.com') {
       if (profile.tier !== 'Lab Rat') {
         console.log(`[${rid}] Super user detected – upgrading to Lab Rat`);
@@ -187,10 +185,8 @@ export default async function handler(req, res) {
     });
   }
 
-  // ---------- Determine max_tokens for this tier ----------
   const maxTokens = TIER_MAX_TOKENS[profile.tier] || 5000;
 
-  // ---------- Parse request ----------
   const { target, goal, typeLabel } = req.body;
   if (!target) return res.status(400).json({ error: 'No target' });
 
@@ -241,7 +237,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Ensure each target has a raw fallback
     for (const t of targetsArray) {
       if (!optimizedQueries[t] || optimizedQueries[t].length === 0) {
         optimizedQueries[t] = [`${t} ${goal || ''}`.trim()];
@@ -287,7 +282,6 @@ export default async function handler(req, res) {
       allPapers.push(...targetPapers);
     }
 
-    // Last‑ditch if still empty
     if (allPapers.length === 0) {
       console.log(`[${rid}] Phase 2b: Last-ditch`);
       try {
