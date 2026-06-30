@@ -6,7 +6,7 @@ const TIER_LIMITS = {
   Free: 3,
   Starter: 50,
   Researcher: 200,
-  'Lab Rat': 999999
+  'Lab Rat': 999999   // effectively unlimited
 };
 
 const TIER_MAX_TOKENS = {
@@ -406,6 +406,7 @@ Filter and return the JSON.`;
       goal_input: goal
     }]);
 
+    // Non‑blocking profile synthesis – no longer slows down the response
     maybeUpdateResearcherProfile(user.id, newCount);
 
     return res.status(200).json(finalJson);
