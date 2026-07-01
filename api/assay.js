@@ -435,7 +435,7 @@ export default async function handler(req, res) {
           { role: 'user', content: userPrompt }
         ],
         max_tokens: maxTokens,
-        temperature: 0.4,
+        temperature: 0.6,
         frequency_penalty: 0.2,
         presence_penalty: 0.1
       })
